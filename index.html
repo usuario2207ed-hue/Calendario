@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendário com Detalhes</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f9;
+        }
+
+        .calendar-container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 350px;
+            text-align: center;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .calendar-header button {
+            background-color: #007BFF;
+            color: #fff;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
+        .calendar-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: #333;
+        }
+
+        .calendar-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .calendar-table th {
+            color: #555;
+            font-weight: bold;
+            padding: 10px 0;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .calendar-table td {
+            text-align: center;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            position: relative;
+            transition: background-color 0.2s;
+        }
+        
+        .calendar-table td:hover {
+            background-color: #e9e9e9;
+        }
+
+        .today {
+            background-color: #007BFF;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .other-month {
+            color: #ccc;
+        }
+
+        .holiday {
+            font-weight: bold;
+            border: 2px solid;
+        }
+        
+        .national {
+            border-color: #dc3545; /* Vermelho para nacional */
+        }
+        
+        .regional {
+            border-color: #ffc107; /* Amarelo para regional */
+        }
+
+        .tooltip {
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 5px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 10;
+        }
+
+        td:hover .tooltip {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="calendar-container">
+        <div class="calendar-header">
+            <button id="prev-month">&lt;</button>
+            <h2 id="month-year"></h2>
+            <button id="next-month">&gt;</button>
+        </div>
+        <table class="calendar-table">
+            <thead>
+                <tr>
+                    <th>Dom</th>
+                    <th>Seg</th>
+                    <th>Ter</th>
+                    <th>Qua</th>
+                    <th>Qui</th>
+                    <th>Sex</th>
+                    <th>Sáb</th>
+                </tr>
+            </thead>
+            <tbody id="calendar-body">
+                </tbody>
+        </table>
+    </div>
+
+    <script>
+        const monthYearEl = document.getElementById('month-year');
+        const calendarBody = document.getElementById('calendar-body');
+        const prevBtn = document.getElementById('prev-month');
+        const nextBtn = document.getElementById('next-month');
+
+        let currentDate = new Date();
+
+        // Lista de feriados e datas comemorativas
+        // Adicionamos a propriedade 'type' e 'description' para cada evento.
+        const holidays = [
+            // Feriados Nacionais
+            { month: 0, day: 1, name: 'Confraternização Universal', type: 'national', description: 'Celebração do ano novo.' },
+            { month: 1, day: 25, name: 'Aniversário de São Paulo', type: 'regional', description: 'Fundação da cidade de São Paulo.' },
+            { month: 2, day: 28, name: 'Aniversário de Salvador', type: 'regional', description: 'Fundação da cidade de Salvador.'},
+            { month: 3, day: 18, name: 'Paixão de Cristo', type: 'national', description: 'Feriado religioso cristão.' },
+            { month: 3, day: 21, name: 'Tiradentes', type: 'national', description: 'Homenagem a Joaquim José da Silva Xavier, mártir da Inconfidência Mineira.' },
+            { month: 4, day: 1, name: 'Dia do Trabalho', type: 'national', description: 'Comemoração internacional do Dia do Trabalho.' },
+            { month: 5, day: 19, name: 'Corpus Christi', type: 'national', description: 'Feriado religioso que celebra o corpo de Cristo.' },
+            { month: 6, day: 9, name: 'Revolução Constitucionalista', type: 'regional', description: 'Marca o início da Revolução de 1932 em São Paulo.' },
+            { month: 8, day: 7, name: 'Independência do Brasil', type: 'national', description: 'Celebra a declaração de independência de Portugal.' },
+            { month: 9, day: 12, name: 'Nossa Senhora Aparecida', type: 'national', description: 'Padroeira do Brasil e Dia das Crianças.' },
+            { month: 10, day: 2, name: 'Finados', type: 'national', description: 'Dia de homenagear os mortos.' },
+            { month: 10, day: 15, name: 'Proclamação da República', type: 'national', description: 'Comemora a Proclamação da República Brasileira de 1889.' },
+            { month: 10, day: 20, name: 'Dia da Consciência Negra', type: 'regional', description: 'Homenagem à cultura e história africana no Brasil.' },
+            { month: 11, day: 25, name: 'Natal', type: 'national', description: 'Celebração do nascimento de Jesus Cristo.' },
+        ];
+
+        function renderCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
+            const lastDateOfMonth = new Date(year, month + 1, 0).getDate();
+            const lastDateOfLastMonth = new Date(year, month, 0).getDate();
+            
+            const monthNames = [
+                'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+            ];
+
+            monthYearEl.textContent = `${monthNames[month]} ${year}`;
+            calendarBody.innerHTML = '';
+
+            let date = 1;
+            let prevMonthDate = lastDateOfLastMonth - firstDayOfMonth + 1;
+            let nextMonthDate = 1;
+
+            for (let i = 0; i < 6; i++) {
+                const row = document.createElement('tr');
+                
+                for (let j = 0; j < 7; j++) {
+                    const cell = document.createElement('td');
+                    let cellDate = 0;
+
+                    if (i === 0 && j < firstDayOfMonth) {
+                        cellDate = prevMonthDate++;
+                        cell.textContent = cellDate;
+                        cell.classList.add('other-month');
+                    } else if (date > lastDateOfMonth) {
+                        cellDate = nextMonthDate++;
+                        cell.textContent = cellDate;
+                        cell.classList.add('other-month');
+                    } else {
+                        cellDate = date;
+                        cell.textContent = cellDate;
+
+                        const today = new Date();
+                        if (cellDate === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
+                            cell.classList.add('today');
+                        }
+
+                        // Verifica se é um feriado ou data comemorativa
+                        const event = holidays.find(h => h.month === month && h.day === cellDate);
+                        if (event) {
+                            cell.classList.add('holiday');
+                            cell.classList.add(event.type); // Adiciona a classe 'national' ou 'regional'
+                            
+                            const tooltip = document.createElement('span');
+                            tooltip.classList.add('tooltip');
+                            tooltip.innerHTML = `<strong>${event.name}</strong><br>${event.description}`;
+                            cell.appendChild(tooltip);
+                        }
+                        
+                        date++;
+                    }
+                    row.appendChild(cell);
+                }
+                calendarBody.appendChild(row);
+                if (date > lastDateOfMonth && nextMonthDate > 7) break;
+            }
+        }
+
+        prevBtn.addEventListener('click', () => {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            renderCalendar();
+        });
+
+        nextBtn.addEventListener('click', () => {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            renderCalendar();
+        });
+        
+        renderCalendar();
+    </script>
+</body>
+</html>
